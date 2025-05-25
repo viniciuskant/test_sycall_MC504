@@ -1,0 +1,37 @@
+Arquivos necessessários para serrem modificados:
+    * Kconfig: https://www.kernel.org/doc/html/latest/kbuild/kconfig-language.html. Colocar um descrição da nova syscall (fiz linha 2104)
+
+    * arch/x86/entry/syscalls/syscall_64.tbl: define o nome e o ponteiro para a syscall (essa é a tabela de syscall do x86). 
+    Caso queira tratar a compatibilidade de 32 e 64 devo usar (mas não para x86):
+    #define __NR_xyzzy 292
+    __SC_COMP(__NR_xyzzy, sys_xyzzy, compat_sys_xyzzy)
+
+    '468 64      read_mc504          sys_read_mc504' (linha 394)
+
+
+
+    * kernel/Makefile: resposável por adicionar de fato o arquivo da syscall na combilação, por uma questão de organização o código da syscall em si fica na mesma pasta que esse make
+
+    obj+=read_mc504.o (linha 19)
+
+    * include/uapi/asm-generic/unistd.h: para adicionar a nova syscall a lista genérica de chamadas de sistemas. Define uma espécie de contador das syscall e deve atualizar o  __NR_syscalls para refletir a chamada adicional do sistema (linha 856 do arquivo). Existe um macro __SYSCALL, que tem dois parâmetros o número da syscall e o rótulo dela, que fica defino em include/linux/syscall.h
+
+    * include/linux/syscall.h: define o cabeçalho da função, o ponto de entrada da syscall para o sistema, e são marcadas com 'asmlinkage'. Isso é para um sistema genérico, mas há alguns arquiteturas, com o x86, que nem uma maneira específica de declarar a syscall.
+
+    asmlinkage long sys_read_mc504(int fd, char __user *buf, size_t count); (linha 1002)
+
+
+    * sys_ni.c : já me perdi, mas é um binário, usar 'xxd' para abrir. 
+
+    * Implementação da syscall:
+        Crie um arquivo chamado read_mc504.c dentro do diretório kernel para implementar a nova syscall.
+
+        Utilize a macro SYSCALL_DEFINE3 para definir a função da syscall, seguindo o exemplo:
+        
+        SYSCALL_DEFINE3(membarrier, int, cmd, unsigned int, flags, int, cpu_id)
+
+        A macro SYSCALL_DEFINEn (onde n é o número de argumentos) define corretamente o ponto de entrada da syscall, evitando problemas de nomeação e ligação. Por exemplo, para uma syscall com três argumentos:
+
+        SYSCALL_DEFINE3(read_mc504, int, fd, char __user *, buf, size_t, count)
+
+        O uso dessa macro permite que o kernel gere os metadados necessários para a nova chamada de sistema, facilitando a integração e manutenção.
