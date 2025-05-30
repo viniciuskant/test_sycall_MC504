@@ -54,3 +54,54 @@ Em resumo, mudamos esses arquivos:
   O uso dessa macro permite que o kernel gere os metadados necessários para a nova chamada de sistema, facilitando a integração e manutenção.
   
 Isso inclui apenas as mudanças para o read_mc504, que foi um teste que fizemos, mas basicamente replicamos a mesma ideia e arquivos para a implementação das outras duas syscalls. 
+
+As diferenças que fizemos no projeto podem ser vista com mais facilidade por meio de um diff que foi executado entre o repositorio original e o que modificamos:
+
+```diff
+$ diff linux linux_original -r --exclude=.git
+
+diff --color -r '--exclude=.git' linux/arch/x86/entry/syscalls/syscall_64.tbl linux_original/arch/x86/entry/syscalls/syscall_64.tbl
+394,396d393
+< 468 common  read_mc504          sys_read_mc504
+< 469 common  set_logging_level   sys_set_logging_level
+< 470 common  get_logging_level   sys_get_logging_level
+
+diff --color -r '--exclude=.git' linux/include/linux/syscalls.h linux_original/include/linux/syscalls.h
+1001,1006d1000
+< //mc504
+< asmlinkage long sys_read_mc504(int fd, char __user *buf, size_t count);
+< asmlinkage long sys_set_logging_level(int subsystem_id, int level);
+< asmlinkage long sys_get_logging_level(int subsystem_id);
+
+diff --color -r '--exclude=.git' linux/include/uapi/asm-generic/unistd.h linux_original/include/uapi/asm-generic/unistd.h
+854,859d853
+< #define __NR_read_mc504 468
+< __SYSCALL(__NR_read_mc504, sys_read_mc504)
+< #define __NR_set_logging_level 469
+< __SYSCALL(__NR_set_logging_level, sys_set_logging_level)
+< #define __NR_get_logging_level 470
+< __SYSCALL(__NR_get_logging_level, sys_get_logging_level)
+862,863c856
+< #define __NR_syscalls 471 //aumentei o valor para replicar a mudança no systema
+<
+---
+> #define __NR_syscalls 468
+
+diff --color -r '--exclude=.git' linux/init/Kconfig linux_original/init/Kconfig
+2104,2112d2103
+< #MC504, ainda não achei onde consigo definir isso como y ou n, para ativar e desativar durante a compilação
+< config CONFIG_MC504_SYSCALL
+< 	bool
+< 	help
+< 		Ativa as syscalls que foram implementadas para a disciplina MC504, que são
+< 		* read_mc504: uma syscall que faz a leitura, porém diferente da syscall padrão de leitura, ela coloca "MC504 TESTE"
+< 		* sys_set_logging_level: uma syscall que define o nível de log de uma parte específica do kernel;
+< 		* sys_get_logging_level: uma syscall que lê o nível de log de uma parte específica do kernel;
+
+diff --color -r '--exclude=.git' linux/kernel/Makefile linux_original/kernel/Makefile
+166,169d165
+< # Irei sempre adicionar por padrão, sem a necessidade de flag
+< obj-y += syscall_mc504.o
+
+Only in linux/kernel: syscall_mc504.c
+```
