@@ -1,22 +1,21 @@
-# SYSCALL MC504
+# Projeto Kernel Linux I - Syscall
 
-Este repositório é dedicado a demonstrar a funcionalidade da implementação de 3 syscalls para a disciplina MC504, que estão nesse [fork](https://github.com/viniciuskant/syscall_MC504/) que fizemos do kernel. 
+Este repositório é dedicado a demonstrar a funcionalidade da implementação de 3 syscalls para a disciplina MC504, que estão nesse [fork](https://github.com/viniciuskant/syscall_MC504/tree/mc504) que fizemos do kernel. 
 
 Para a implementação dessas syscalls, seguimos os seguintes materiais de referência:
 
 - [Documentação oficial do kernel.org sobre syscalls](https://www.kernel.org/doc/html/latest/process/adding-syscalls.html#compatibility-system-calls-generic)
 - [Material do LKCamp sobre system calls](https://docs.lkcamp.dev/unicamp_group/systemcalls/)
 
-Em resumo, mudamos esses arquivos:
+---
+
+## Mudanças feitas no kernel
+
+Em resumo, alteramos esses arquivos:
 
 - **Kconfig**: [Documentação](https://www.kernel.org/doc/html/latest/kbuild/kconfig-language.html). Colocar uma descrição da nova syscall (feito na linha 2104).
 
 - **arch/x86/entry/syscalls/syscall_64.tbl**: Define o nome e o ponteiro para a syscall (essa é a tabela de syscall do x86).  
-  Caso queira tratar a compatibilidade de 32 e 64 bits devo usar (mas não para x86):
-  ```c
-  #define __NR_xyzzy 292
-  __SC_COMP(__NR_xyzzy, sys_xyzzy, compat_sys_xyzzy)
-  ```
   Exemplo adicionado:
   ```text
   468 64      read_mc504          sys_read_mc504
@@ -25,7 +24,7 @@ Em resumo, mudamos esses arquivos:
 
 - **kernel/Makefile**: Responsável por adicionar de fato o arquivo da syscall na compilação. Por uma questão de organização, o código da syscall em si fica na mesma pasta que esse Makefile.
   ```makefile
-  obj-y += read_mc504.o
+  obj-y += syscall_mc504.o
   ```
   (linha 19)
 
@@ -38,22 +37,26 @@ Em resumo, mudamos esses arquivos:
   ```
   (linha 1002)
 
-- **sys_ni.c**: Já me perdi, mas é um binário, usar `xxd` para abrir.
-
 - **Implementação da syscall**:  
-  Crie um arquivo chamado `read_mc504.c` dentro do diretório `kernel` para implementar a nova syscall.
+  A syscall `read_mc504` realiza uma leitura modificada de um arquivo: além de ler até `count` bytes do descritor de arquivo `fd`, ela concatena ao final do conteúdo lido a string `"MC504 TESTE"` antes de copiá-lo para o buffer de usuário `buf`. Se um ponteiro de posição `pos` for fornecido, ele é atualizado conforme a leitura.  
+  Essa syscall pode ser útil para fins de teste durante o desenvolvimento do kernel.
 
-  Utilize a macro `SYSCALL_DEFINE3` para definir a função da syscall, seguindo o exemplo:
-  ```c
-  SYSCALL_DEFINE3(membarrier, int, cmd, unsigned int, flags, int, cpu_id)
-  ```
-  A macro `SYSCALL_DEFINEn` (onde n é o número de argumentos) define corretamente o ponto de entrada da syscall, evitando problemas de nomeação e ligação. Por exemplo, para uma syscall com três argumentos:
-  ```c
-  SYSCALL_DEFINE4(read_mc504, int, fd, char __user *, buf, size_t, count)
-  ```
-  O uso dessa macro permite que o kernel gere os metadados necessários para a nova chamada de sistema, facilitando a integração e manutenção.
-  
-Isso inclui apenas as mudanças para o read_mc504, que foi um teste que fizemos, mas basicamente replicamos a mesma ideia e arquivos para a implementação das outras duas syscalls. 
+  A syscall `set_logging_level` permite configurar o nível de log de um subsistema específico do kernel. Ela recebe dois parâmetros: um identificador do subsistema (`subsystem_id`) e o nível desejado (`level`). Com isso, é possível controlar dinamicamente a verbosidade da saída de logs de partes específicas do kernel.
+
+  A syscall `get_logging_level` retorna o nível de log atual de um subsistema identificado por `subsystem_id`. Ela facilita a inspeção e depuração do sistema, permitindo que programas em espaço de usuário verifiquem o estado da configuração de logging de diferentes partes do kernel.
+
+
+---
+
+## Conceito de Subsistema
+
+Dentro do kernel, um **subsistema** é uma parte isolada e especializada que implementa funcionalidades específicas, como gerenciamento de processos, rede, sistema de arquivos, etc.
+
+No nosso caso, as syscalls `set_logging_level` e `get_logging_level` trabalham com o conceito de subsistemas para permitir ativar/desativar logs para partes específicas do kernel.
+
+---
+
+## Diff entre o kernel original e o modificado
 
 As diferenças que fizemos no projeto podem ser vista com mais facilidade por meio de um diff que foi executado entre o repositorio original e o que modificamos:
 
@@ -68,7 +71,6 @@ diff --color -r '--exclude=.git' linux/arch/x86/entry/syscalls/syscall_64.tbl li
 
 diff --color -r '--exclude=.git' linux/include/linux/syscalls.h linux_original/include/linux/syscalls.h
 1001,1006d1000
-< //mc504
 < asmlinkage long sys_read_mc504(int fd, char __user *buf, size_t count);
 < asmlinkage long sys_set_logging_level(int subsystem_id, int level);
 < asmlinkage long sys_get_logging_level(int subsystem_id);
@@ -89,7 +91,6 @@ diff --color -r '--exclude=.git' linux/include/uapi/asm-generic/unistd.h linux_o
 
 diff --color -r '--exclude=.git' linux/init/Kconfig linux_original/init/Kconfig
 2104,2112d2103
-< #MC504, ainda não achei onde consigo definir isso como y ou n, para ativar e desativar durante a compilação
 < config CONFIG_MC504_SYSCALL
 < 	bool
 < 	help
@@ -100,8 +101,41 @@ diff --color -r '--exclude=.git' linux/init/Kconfig linux_original/init/Kconfig
 
 diff --color -r '--exclude=.git' linux/kernel/Makefile linux_original/kernel/Makefile
 166,169d165
-< # Irei sempre adicionar por padrão, sem a necessidade de flag
 < obj-y += syscall_mc504.o
 
 Only in linux/kernel: syscall_mc504.c
 ```
+
+## Arquivos de Teste das Syscalls
+
+Foram desenvolvidos dois arquivos de teste em C para validar o funcionamento das syscalls implementadas: `read_mc504`, `set_logging_level` e `get_logging_level`.
+
+### `test_file.c`
+
+Este programa testa a syscall `read_mc504`, que é uma variação da syscall de leitura padrão do Linux. Essa syscall faz a leitura de dados do descritor de arquivo `fd` (no caso, `0`, que é a entrada padrão) e concatena a string `"MC504 TESTE"` ao final dos dados lidos antes de copiá-los para o buffer do usuário.
+
+**Funcionamento do programa:**
+- Declara um buffer de 128 bytes.
+- Faz uma chamada direta à syscall `read_mc504` usando `syscall(__NR_read_mc504, 0, buffer, sizeof(buffer))`.
+- Caso a chamada falhe, imprime uma mensagem de erro.
+- Caso tenha sucesso, imprime o conteúdo do buffer (que deve incluir `"MC504 TESTE"`).
+
+Esse programa serve para verificar rapidamente se a syscall foi corretamente registrada e executa como esperado no kernel modificado.
+
+---
+
+### `logging_level.c`
+
+Este programa testa as syscalls `set_logging_level` e `get_logging_level`, responsáveis por definir e consultar o nível de logging de um subsistema do kernel.
+
+**Funcionamento do programa:**
+- Define dois wrappers simples para as syscalls:
+  - `set_logging_level(int subsystem_id, int level)`
+  - `get_logging_level(int subsystem_id)`
+- Usa `syscall()` diretamente para verificar se as syscalls estão disponíveis no sistema (verificando `errno == ENOSYS`).
+- Consulta o nível atual de logging do subsistema `subsystem_id = 5`.
+- Alterna o nível de logging: se for `0`, define como `2`; caso contrário, define como `0`.
+- Consulta novamente para verificar se a mudança foi aplicada.
+- Por fim, restaura o nível original para fins de consistência na demonstração.
+
+Esse programa permite validar o funcionamento das duas syscalls associadas ao controle de logging, além de servir como exemplo prático de uso em espaço de usuário.
